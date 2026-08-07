@@ -1,5 +1,5 @@
 // Substitua a string abaixo pela NOVA URL obtida na implantação do Apps Script
-const URL_WEB_APP_GSHEETS = "COLE_AQUI_A_NOVA_URL_DO_SEU_WEB_APP";
+const URL_WEB_APP_GSHEETS = "https://script.google.com/a/macros/seduc.ce.gov.br/s/AKfycbyQIiJP3ooupBeaLM12YgKfZsVb4tHDr7pQcPTPC587d3bHRGhfCGJ-cbJNBL-yWLp0/exec";
 
 /**
  * Envia os dados da rescisão para a planilha do Google via formulário em iframe oculto.
