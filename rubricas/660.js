@@ -1,61 +1,31 @@
-function gerarCalculo660(data, valorVencimento) {
-    const dAlt = parseDataBR(data.dtalt);
+function gerarCalculo660(data, valorVencimento, tipoLancamento = 'INCLUSÃO') {
+    const matricula = data.matricula || '';
+    const nome = data.nome || '';
+    const textoLancamento = tipoLancamento.toUpperCase();
 
-    if (!dAlt) {
-        return `<div class="calc-card-item"><h4>RUBRICA 660</h4><div class="error-msg">Data de Alteração (DTALT) inválida.</div></div>`;
-    }
-
-    const mesesNomes = [
-        "JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO",
-        "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"
-    ];
-
-    const diaAlt = dAlt.getDate();
-    const anoAlt = dAlt.getFullYear();
-    const mesAltIdx = dAlt.getMonth();
-    const nomeMesAtual = mesesNomes[mesAltIdx];
-    
-    // Total de dias do mês da rescisão
-    const totalDiasMes = new Date(anoAlt, mesAltIdx + 1, 0).getDate();
-
-    // Dias a devolver (dias restantes do mês após a DTALT)
-    const diasDevolver = totalDiasMes - diaAlt;
-
-    if (diasDevolver <= 0) {
-        return `
-            <div class="calc-card-item">
-                <h4>RUBRICA 660 - DESPESA ANULAR</h4>
-                <div class="calc-details">A data de rescisão (${data.dtalt}) corresponde ao último dia do mês. Não há dias a devolver.</div>
-            </div>
-        `;
-    }
-
-    // Vencimento de 1 dia
-    const vencimentoDia = valorVencimento / totalDiasMes;
-    const vencimentoDiaArred = Math.round(vencimentoDia * 100) / 100;
-
-    // Valor Total a Devolver
-    const totalDevolucao = Math.round((vencimentoDiaArred * diasDevolver) * 100) / 100;
-
-    const memoriaCalculoStr = `${formatarMoeda(valorVencimento)} / ${totalDiasMes} DIAS = ${formatarMoeda(vencimentoDiaArred)} * ${diasDevolver} DIAS DEVOLVIDOS = ${formatarMoeda(totalDevolucao)}`;
-    const textoJustificativa = `${data.matricula} ${data.nome.toUpperCase()} INCLUSÃO DE DESPESA ANULAR REFERENTE A DEVOLUÇÃO DE ${diasDevolver} DIAS (${memoriaCalculoStr}), DEVIDO RESCISÃO DE CONTRATO EM ${data.dtalt}`;
-
-    const copyTextId = `copy_text_660_${data.cardId}`;
+    const textoCopia = `${matricula} ${nome} ${textoLancamento} DE DESPESA ANULAR NO VALOR DE R$ ${valorVencimento.toFixed(2).replace('.', ',')} REFERENTE A RESCISÃO DE CONTRATO EM ${data.dtalt}`;
 
     return `
         <div class="calc-card-item">
             <h4>RUBRICA 660 - DESPESA ANULAR</h4>
             <div class="calc-details">
-                <strong>Mês da Rescisão (${nomeMesAtual}):</strong> ${formatarMoeda(valorVencimento)} &divide; ${totalDiasMes} dias = ${formatarMoeda(vencimentoDiaArred)}/dia<br>
-                <strong>Dias a Devolver (${diasDevolver} dias):</strong> ${formatarMoeda(vencimentoDiaArred)} &times; ${diasDevolver} = <strong>${formatarMoeda(totalDevolucao)}</strong>
+                • <strong>Valor Total Vencimento:</strong> R$ ${valorVencimento.toFixed(2).replace('.', ',')}<br>
+                • <strong>Data de Rescisão:</strong> ${data.dtalt}
+            </div>
+
+            <div class="lancamento-selector" style="margin: 0.75rem 0; font-size: 0.85rem; background: #ffffff; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px;">
+                <strong style="display:block; margin-bottom: 0.3rem; color: var(--text-dark);">Tipo de Lançamento:</strong>
+                <label style="margin-right: 15px; cursor: pointer; font-weight: 500;">
+                    <input type="radio" name="tipo_660_${data.cardId}" value="INCLUSÃO" ${tipoLancamento === 'INCLUSÃO' ? 'checked' : ''} onchange="recalcularRubricaEspecifica('${data.cardId}', '660', this.value)"> INCLUSÃO
+                </label>
+                <label style="cursor: pointer; font-weight: 500;">
+                    <input type="radio" name="tipo_660_${data.cardId}" value="ALTERAÇÃO" ${tipoLancamento === 'ALTERAÇÃO' ? 'checked' : ''} onchange="recalcularRubricaEspecifica('${data.cardId}', '660', this.value)"> ALTERAÇÃO
+                </label>
             </div>
 
             <div class="copy-box-container">
-                <div class="copy-box-text" id="${copyTextId}">${textoJustificativa}</div>
-                <button class="btn-copy" onclick="copiarTexto('${copyTextId}')">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                    Copiar Texto
-                </button>
+                <div class="copy-box-text" id="text_660_${data.cardId}">${textoCopia}</div>
+                <button class="btn-copy" onclick="copiarTexto('text_660_${data.cardId}')">📋 Copiar Texto</button>
             </div>
         </div>
     `;
