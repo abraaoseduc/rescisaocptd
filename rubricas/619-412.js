@@ -16,7 +16,7 @@ function renderizarCardVA(cardId, data) {
         totalDisplay.innerText = formatarMoeda(totalCalcVal);
     }
 
-    // 2. Atualiza o valor do input (caso a mudança tenha vindo do clique no calendário)
+    // 2. Atualiza o valor do input de dias
     const inputDias = document.getElementById(`input_dias_va_${cardId}`);
     if (inputDias && document.activeElement !== inputDias) {
         inputDias.value = diasCalc;
@@ -24,11 +24,13 @@ function renderizarCardVA(cardId, data) {
 
     // 3. Atualiza o texto da justificativa
     const is619 = state.rubrica === '619';
+    const tipoOperacao = state.tipoOperacao || 'INCLUSÃO';
+    
     let justificativa = '';
     if (is619) {
-        justificativa = `${data.matricula} ${data.nome.toUpperCase()} INCLUSÃO DE DEVOLUÇÃO DE VALORES REFERENTE AO AUXÍLIO ALIMENTAÇÃO (${memoriaStr}), DEVIDO A RESCISÃO DE CONTRATO EM ${data.dtalt}`;
+        justificativa = `${data.matricula} ${data.nome.toUpperCase()} ${tipoOperacao} DE DEVOLUÇÃO DE VALORES REFERENTE AO AUXÍLIO ALIMENTAÇÃO (${memoriaStr}), DEVIDO A RESCISÃO DE CONTRATO EM ${data.dtalt}`;
     } else {
-        justificativa = `${data.matricula} ${data.nome.toUpperCase()} INCLUSÃO DE VALORES A SEREM PAGOS REFERENTE AO AUXÍLIO ALIMENTAÇÃO (${memoriaStr}), DEVIDO A RESCISÃO DE CONTRATO EM ${data.dtalt}`;
+        justificativa = `${data.matricula} ${data.nome.toUpperCase()} ${tipoOperacao} DE VALORES A SEREM PAGOS REFERENTE AO AUXÍLIO ALIMENTAÇÃO (${memoriaStr}), DEVIDO A RESCISÃO DE CONTRATO EM ${data.dtalt}`;
     }
 
     const copyTextEl = document.getElementById(`copy_text_va_${cardId}`);
@@ -52,10 +54,69 @@ function toggleDiaVA(cardId, dateStr, element) {
         element.style.color = "#166534";
     }
 
-    // Sincroniza a quantidade com o total de dias marcados no calendário
     window.vaState[cardId].diasCalculo = window.vaState[cardId].selectedDays.length;
 
-    // Atualiza os campos de valor e justificativa em tempo real
+    if (window.vaDataStore && window.vaDataStore[cardId]) {
+        renderizarCardVA(cardId, window.vaDataStore[cardId]);
+    }
+}
+
+function toggleMesInteiroVA(cardId, ano, mesIdx) {
+    if (!window.vaState[cardId]) return;
+
+    const totalDiasMes = new Date(ano, mesIdx + 1, 0).getDate();
+    const diasUteisMes = [];
+
+    for (let d = 1; d <= totalDiasMes; d++) {
+        const dateObj = new Date(ano, mesIdx, d);
+        const dow = dateObj.getDay();
+        if (dow !== 0 && dow !== 6) {
+            const dateStr = `${ano}-${String(mesIdx + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            diasUteisMes.push(dateStr);
+        }
+    }
+
+    // Verifica se todos os dias úteis deste mês já estão selecionados
+    const todosSelecionados = diasUteisMes.every(d => window.vaState[cardId].selectedDays.includes(d));
+
+    const mesContainer = document.getElementById(`cal_mes_${cardId}_${ano}_${mesIdx}`);
+
+    if (todosSelecionados) {
+        // Desmarca todos os dias úteis desse mês
+        window.vaState[cardId].selectedDays = window.vaState[cardId].selectedDays.filter(d => !diasUteisMes.includes(d));
+        
+        // Atualiza o estilo visual no DOM
+        if (mesContainer) {
+            diasUteisMes.forEach(dateStr => {
+                const el = mesContainer.querySelector(`[data-date="${dateStr}"]`);
+                if (el) {
+                    el.style.background = "#f8fafc";
+                    el.style.color = "#64748b";
+                }
+            });
+        }
+    } else {
+        // Marca todos os dias úteis desse mês
+        diasUteisMes.forEach(dateStr => {
+            if (!window.vaState[cardId].selectedDays.includes(dateStr)) {
+                window.vaState[cardId].selectedDays.push(dateStr);
+            }
+        });
+
+        // Atualiza o estilo visual no DOM
+        if (mesContainer) {
+            diasUteisMes.forEach(dateStr => {
+                const el = mesContainer.querySelector(`[data-date="${dateStr}"]`);
+                if (el) {
+                    el.style.background = "#dcfce7";
+                    el.style.color = "#166534";
+                }
+            });
+        }
+    }
+
+    window.vaState[cardId].diasCalculo = window.vaState[cardId].selectedDays.length;
+
     if (window.vaDataStore && window.vaDataStore[cardId]) {
         renderizarCardVA(cardId, window.vaDataStore[cardId]);
     }
@@ -64,6 +125,14 @@ function toggleDiaVA(cardId, dateStr, element) {
 function changeRubricaVA(cardId, rubricaVal) {
     if (!window.vaState[cardId]) return;
     window.vaState[cardId].rubrica = rubricaVal;
+    if (window.vaDataStore && window.vaDataStore[cardId]) {
+        renderizarCardVA(cardId, window.vaDataStore[cardId]);
+    }
+}
+
+function changeTipoOperacaoVA(cardId, tipoVal) {
+    if (!window.vaState[cardId]) return;
+    window.vaState[cardId].tipoOperacao = tipoVal;
     if (window.vaDataStore && window.vaDataStore[cardId]) {
         renderizarCardVA(cardId, window.vaDataStore[cardId]);
     }
@@ -84,9 +153,11 @@ function gerarCalendarioHTML(ano, mesIdx, nomeMes, selectedDays, cardId) {
     const firstDayOfWeek = new Date(ano, mesIdx, 1).getDay();
 
     let calHTML = `
-        <div style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:0.75rem; flex:1; min-width:240px;">
-            <div style="font-weight:bold; font-size:0.85rem; text-align:center; margin-bottom:0.4rem; color:var(--text-main);">
-                ${nomeMes} / ${ano}
+        <div id="cal_mes_${cardId}_${ano}_${mesIdx}" style="background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:0.6rem; flex:1; min-width:210px;">
+            <div onclick="toggleMesInteiroVA('${cardId}', ${ano}, ${mesIdx})" 
+                 style="font-weight:bold; font-size:0.85rem; text-align:center; margin-bottom:0.4rem; color:var(--primary); cursor:pointer; background:#f1f5f9; padding:4px; border-radius:4px; user-select:none;"
+                 title="Clique para selecionar/desmarcar todos os dias úteis deste mês">
+                ${nomeMes} / ${ano} 🖱️
             </div>
             <div style="display:grid; grid-template-columns: repeat(7, 1fr); gap:2px; text-align:center; font-size:0.75rem;">
                 <div style="font-weight:bold; background:#e2e8f0; padding:2px;">DOM</div>
@@ -126,7 +197,7 @@ function gerarCalendarioHTML(ano, mesIdx, nomeMes, selectedDays, cardId) {
         const clickAttr = !isWeekend ? `onclick="toggleDiaVA('${cardId}', '${dateStr}', this)"` : '';
 
         calHTML += `
-            <div ${clickAttr} style="background:${bg}; color:${color}; border:1px solid #cbd5e1; border-radius:3px; padding:4px 2px; font-weight:bold; cursor:${cursor}; font-size:0.75rem; user-select:none;" title="${isWeekend ? 'Fim de semana' : (isSelected ? 'Dia útil selecionado' : 'Dia útil desmarcado')}">
+            <div ${clickAttr} data-date="${dateStr}" style="background:${bg}; color:${color}; border:1px solid #cbd5e1; border-radius:3px; padding:4px 2px; font-weight:bold; cursor:${cursor}; font-size:0.75rem; user-select:none;" title="${isWeekend ? 'Fim de semana' : (isSelected ? 'Dia útil selecionado' : 'Dia útil desmarcado')}">
                 ${d}
             </div>
         `;
@@ -156,10 +227,13 @@ function gerarCalculoValeAlimentacao(data) {
     const anoAnterior = dtAnterior.getFullYear();
     const mesAnteriorIdx = dtAnterior.getMonth();
 
+    const dtPosterior = new Date(anoDtAlt, mesDtAltIdx + 1, 1);
+    const anoPosterior = dtPosterior.getFullYear();
+    const mesPosteriorIdx = dtPosterior.getMonth();
+
     if (!window.vaState[cardId]) {
         const initialSelectedDays = [];
 
-        // Pré-seleciona apenas os dias úteis do MÊS DA DTALT até o dia da DTALT
         for (let d = 1; d <= dAlt.getDate(); d++) {
             const dt = new Date(anoDtAlt, mesDtAltIdx, d);
             const dow = dt.getDay();
@@ -171,6 +245,7 @@ function gerarCalculoValeAlimentacao(data) {
         window.vaState[cardId] = {
             selectedDays: initialSelectedDays,
             rubrica: '619',
+            tipoOperacao: 'INCLUSÃO',
             diasCalculo: initialSelectedDays.length
         };
     }
@@ -180,19 +255,24 @@ function gerarCalculoValeAlimentacao(data) {
 
     const calAnteriorHTML = gerarCalendarioHTML(anoAnterior, mesAnteriorIdx, mesesNomes[mesAnteriorIdx], state.selectedDays, cardId);
     const calDtAltHTML = gerarCalendarioHTML(anoDtAlt, mesDtAltIdx, mesesNomes[mesDtAltIdx], state.selectedDays, cardId);
+    const calPosteriorHTML = gerarCalendarioHTML(anoPosterior, mesPosteriorIdx, mesesNomes[mesPosteriorIdx], state.selectedDays, cardId);
 
     const is619 = state.rubrica === '619';
     const is412 = state.rubrica === '412';
+
+    const isInclusao = (state.tipoOperacao || 'INCLUSÃO') === 'INCLUSÃO';
+    const isAlteracao = state.tipoOperacao === 'ALTERAÇÃO';
 
     const diasCalc = state.diasCalculo;
     const totalCalcVal = Math.round((diasCalc * valorDiario) * 100) / 100;
     const memoriaStr = `${diasCalc} DIAS X R$ 16,96 = ${formatarMoeda(totalCalcVal)}`;
 
+    const tipoOpText = state.tipoOperacao || 'INCLUSÃO';
     let justificativa = '';
     if (is619) {
-        justificativa = `${data.matricula} ${data.nome.toUpperCase()} INCLUSÃO DE DEVOLUÇÃO DE VALORES REFERENTE AO AUXÍLIO ALIMENTAÇÃO (${memoriaStr}), DEVIDO A RESCISÃO DE CONTRATO EM ${data.dtalt}`;
+        justificativa = `${data.matricula} ${data.nome.toUpperCase()} ${tipoOpText} DE DEVOLUÇÃO DE VALORES REFERENTE AO AUXÍLIO ALIMENTAÇÃO (${memoriaStr}), DEVIDO A RESCISÃO DE CONTRATO EM ${data.dtalt}`;
     } else {
-        justificativa = `${data.matricula} ${data.nome.toUpperCase()} INCLUSÃO DE VALORES A SEREM PAGOS REFERENTE AO AUXÍLIO ALIMENTAÇÃO (${memoriaStr}), DEVIDO A RESCISÃO DE CONTRATO EM ${data.dtalt}`;
+        justificativa = `${data.matricula} ${data.nome.toUpperCase()} ${tipoOpText} DE VALORES A SEREM PAGOS REFERENTE AO AUXÍLIO ALIMENTAÇÃO (${memoriaStr}), DEVIDO A RESCISÃO DE CONTRATO EM ${data.dtalt}`;
     }
 
     const copyTextId = `copy_text_va_${cardId}`;
@@ -214,12 +294,13 @@ function gerarCalculoValeAlimentacao(data) {
             </div>
 
             <div style="font-size:0.75rem; color:#b45309; background:#fffbeb; border:1px solid #fcd34d; padding:0.4rem; border-radius:4px; margin-bottom:0.5rem;">
-                ⚠️ <strong>Aviso:</strong> Confira os dias úteis a serem pagos.
+                ⚠️ <strong>Aviso:</strong> Confira os dias úteis a serem pagos. Clique no nome do mês para selecionar/desmarcar todos os dias úteis.
             </div>
 
             <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
                 ${calAnteriorHTML}
                 ${calDtAltHTML}
+                ${calPosteriorHTML}
             </div>
 
             <div style="margin-top:0.75rem; background:#f0fdf4; border:1px solid #bbf7d0; padding:0.75rem; border-radius:6px;">
@@ -227,11 +308,23 @@ function gerarCalculoValeAlimentacao(data) {
                     Quantidade de dias a serem calculados (${is619 ? 'Devolução - Rubrica 619' : 'Pagamento - Rubrica 412'}):
                 </label>
                 <div style="display:flex; align-items:center; gap:0.5rem;">
-                    <input type="number" id="input_dias_va_${cardId}" value="${diasCalc}" placeholder="0" min="0" max="62" style="width:80px; padding:0.4rem; border:1px solid #cbd5e1; border-radius:4px; font-size:0.9rem; font-weight:bold;" oninput="updateDiasVA('${cardId}', this.value)">
+                    <input type="number" id="input_dias_va_${cardId}" value="${diasCalc}" placeholder="0" min="0" max="93" style="width:80px; padding:0.4rem; border:1px solid #cbd5e1; border-radius:4px; font-size:0.9rem; font-weight:bold;" oninput="updateDiasVA('${cardId}', this.value)">
                     <span style="font-size:0.85rem; font-weight:bold; color:var(--text-dark);">
                         dias &times; R$ 16,96 = <span id="total_va_display_${cardId}" style="color:var(--primary); font-size:1rem;">${formatarMoeda(totalCalcVal)}</span>
                     </span>
                 </div>
+            </div>
+
+            <div style="margin-top:0.5rem; font-size:0.85rem; display:flex; gap:1rem; align-items:center; background:#e2e8f0; padding:0.5rem; border-radius:4px;">
+                <strong>Tipo de Operação:</strong>
+                <label style="cursor:pointer; display:inline-flex; align-items:center; gap:0.2rem;">
+                    <input type="radio" name="radio_tipo_op_${cardId}" value="INCLUSÃO" ${isInclusao ? 'checked' : ''} onchange="changeTipoOperacaoVA('${cardId}', 'INCLUSÃO')">
+                    <strong>INCLUSÃO</strong>
+                </label>
+                <label style="cursor:pointer; display:inline-flex; align-items:center; gap:0.2rem;">
+                    <input type="radio" name="radio_tipo_op_${cardId}" value="ALTERAÇÃO" ${isAlteracao ? 'checked' : ''} onchange="changeTipoOperacaoVA('${cardId}', 'ALTERAÇÃO')">
+                    <strong>ALTERAÇÃO</strong>
+                </label>
             </div>
 
             <div class="copy-box-container" style="margin-top:0.75rem;">
