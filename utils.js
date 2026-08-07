@@ -1,17 +1,17 @@
-// Substitua a string abaixo pela NOVA URL obtida na implantação do Apps Script
+// URL da sua API do Google Apps Script na SEDUC (Atualizada)
 const URL_WEB_APP_GSHEETS = "https://script.google.com/a/macros/seduc.ce.gov.br/s/AKfycbyQIiJP3ooupBeaLM12YgKfZsVb4tHDr7pQcPTPC587d3bHRGhfCGJ-cbJNBL-yWLp0/exec";
 
 /**
- * Envia os dados da rescisão para a planilha do Google via formulário em iframe oculto.
- * @param {Object} payload Objeto com os dados a serem gravados
+ * Envia os dados da rescisão para a planilha via Formulário Dinâmico em Iframe
+ * @param {Object} payload Dados do cálculo
  */
 function enviarRescisaoPlanilha(payload) {
     if (!URL_WEB_APP_GSHEETS || URL_WEB_APP_GSHEETS.includes("COLE_AQUI")) {
-        alert("Erro: A URL do Apps Script não foi configurada no arquivo util.js.");
+        alert("Erro: A URL do Apps Script não foi configurada corretamente.");
         return;
     }
 
-    // Garante a existência do iframe invisível na página
+    // Procura ou cria o iframe oculto no DOM
     let iframe = document.getElementById("hidden_iframe_gsheet");
     if (!iframe) {
         iframe = document.createElement("iframe");
@@ -21,7 +21,7 @@ function enviarRescisaoPlanilha(payload) {
         document.body.appendChild(iframe);
     }
 
-    // Feedback visual para o botão ativo
+    // Feedback visual do botão
     const botaoClicado = document.activeElement;
     let textoOriginal = "";
     if (botaoClicado && botaoClicado.tagName === "BUTTON") {
@@ -30,7 +30,7 @@ function enviarRescisaoPlanilha(payload) {
         botaoClicado.disabled = true;
     }
 
-    // Monta o formulário de envio assíncrono direcionado ao iframe
+    // Cria formulário dinâmico para submeter via POST para o iframe
     const form = document.createElement("form");
     form.method = "POST";
     form.action = URL_WEB_APP_GSHEETS;
@@ -54,7 +54,7 @@ function enviarRescisaoPlanilha(payload) {
             }
         }, 1200);
     } catch (e) {
-        console.error("Erro ao submeter dados:", e);
+        console.error("Erro ao submeter formulário:", e);
         alert("Falha ao tentar enviar os dados para a planilha.");
         if (botaoClicado && botaoClicado.tagName === "BUTTON") {
             botaoClicado.innerHTML = textoOriginal;
@@ -63,66 +63,4 @@ function enviarRescisaoPlanilha(payload) {
     } finally {
         document.body.removeChild(form);
     }
-}
-
-/**
- * Copia o texto contido em um elemento HTML para a área de transferência
- * @param {string} containerId ID do elemento que contém o texto
- */
-function copiarTexto(containerId) {
-    const el = document.getElementById(containerId);
-    if (!el) return;
-
-    const texto = el.innerText || el.textContent;
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(texto).then(() => {
-            alert("Texto copiado com sucesso!");
-        }).catch(err => {
-            fallbackCopiarTexto(texto);
-        });
-    } else {
-        fallbackCopiarTexto(texto);
-    }
-}
-
-function fallbackCopiarTexto(texto) {
-    const areaTexto = document.createElement("textarea");
-    areaTexto.value = texto;
-    document.body.appendChild(areaTexto);
-    areaTexto.select();
-    document.execCommand("copy");
-    document.body.removeChild(areaTexto);
-    alert("Texto copiado com sucesso!");
-}
-
-/**
- * Formata um valor numérico para Moeda Brasileira (BRL)
- * @param {number} valor 
- * @returns {string} Valor formatado (ex: R$ 1.500,00)
- */
-function formatarMoeda(valor) {
-    return (valor || 0).toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-    });
-}
-
-/**
- * Converte data em texto (DD/MM/AAAA) para objeto Date
- * @param {string} dataStr 
- * @returns {Date|null}
- */
-function parseDataBR(dataStr) {
-    if (!dataStr) return null;
-    const partes = dataStr.split('/');
-    if (partes.length !== 3) return null;
-
-    const dia = parseInt(partes[0], 10);
-    const mes = parseInt(partes[1], 10) - 1;
-    const ano = parseInt(partes[2], 10);
-
-    if (isNaN(dia) || isNaN(mes) || isNaN(ano)) return null;
-
-    return new Date(ano, mes, dia);
 }
