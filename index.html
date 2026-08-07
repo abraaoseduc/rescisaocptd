@@ -199,6 +199,12 @@
             color: var(--text-dark);
         }
 
+        /* Estilo para marcar Sim em vermelho (Ocorrência confirmada) */
+        .info-group span.text-sim {
+            color: #dc2626 !important;
+            font-weight: 700 !important;
+        }
+
         .info-grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -376,7 +382,6 @@
             margin-top: 0.5rem;
         }
 
-        /* ESTILO PARA IMPRESSÃO / PDF */
         @media print {
             @page {
                 size: A4 portrait;
@@ -407,7 +412,7 @@
                 color: #14532d !important;
             }
 
-            .input-section, .print-section, .btn-copy, .rubricas-container, .badge-block:has(.rubricas-container), .lancamento-selector {
+            .input-section, .print-section, .btn-copy, .rubricas-container, .badge-block:has(.rubricas-container), .lancamento-selector, .folha-selector, .diferencas-selector {
                 display: none !important;
             }
 
@@ -571,6 +576,8 @@
 
     <script>
         window.estadoTiposLancamento = {};
+        window.estadoBloqueioFolha = {};
+        window.estadoDiferencas321_476 = {};
 
         const TABELA_K081_K082 = {
             1:  { mensal: 5,   remuneracao: 130.74,  pvr: 12.50,  somatorio: 143.24 },
@@ -671,6 +678,15 @@
             return limpo;
         }
 
+        function formatarOcorrencia(val) {
+            if (!val) return { texto: 'Não', classe: '' };
+            const v = val.trim().toUpperCase();
+            if (v === 'S' || v === 'SIM') {
+                return { texto: 'Sim', classe: 'text-sim' };
+            }
+            return { texto: 'Não', classe: '' };
+        }
+
         function parseDataBR(dataStr) {
             if (!dataStr) return null;
             const partes = dataStr.trim().split('/');
@@ -739,6 +755,39 @@
             }
         }
 
+        function atualizarBloqueioFolha(cardId, rubrica) {
+            if (!window.estadoBloqueioFolha[cardId]) {
+                window.estadoBloqueioFolha[cardId] = {};
+            }
+
+            const chk = document.getElementById(`chk_bloqueio_${rubrica}_${cardId}`);
+            const inputNum = document.getElementById(`num_folha_${rubrica}_${cardId}`);
+
+            window.estadoBloqueioFolha[cardId][rubrica] = {
+                bloqueado: chk ? chk.checked : false,
+                numFolha: inputNum ? inputNum.value : ''
+            };
+
+            const card = document.getElementById(cardId);
+            if (card && card.dataset.json) {
+                atualizarCalculos(card.dataset.json);
+            }
+        }
+
+        function atualizarDiferencas321_476(cardId, rubrica) {
+            if (!window.estadoDiferencas321_476[cardId]) {
+                window.estadoDiferencas321_476[cardId] = {};
+            }
+
+            const chk = document.getElementById(`chk_diferencas_${rubrica}_${cardId}`);
+            window.estadoDiferencas321_476[cardId][rubrica] = chk ? chk.checked : false;
+
+            const card = document.getElementById(cardId);
+            if (card && card.dataset.json) {
+                atualizarCalculos(card.dataset.json);
+            }
+        }
+
         function atualizarCalculos(cardDataJson) {
             const data = JSON.parse(decodeURIComponent(cardDataJson));
             const card = document.getElementById(data.cardId);
@@ -789,6 +838,8 @@
 
             selecionadas.forEach((rubrica) => {
                 const tipoSalvo = (window.estadoTiposLancamento[data.cardId] && window.estadoTiposLancamento[data.cardId][rubrica]) || 'INCLUSÃO';
+                const bloqInfo = (window.estadoBloqueioFolha[data.cardId] && window.estadoBloqueioFolha[data.cardId][rubrica]) || { bloqueado: false, numFolha: '' };
+                const difSalva = (window.estadoDiferencas321_476[data.cardId] && window.estadoDiferencas321_476[data.cardId][rubrica]) || false;
 
                 if (rubrica === '3158') {
                     if (typeof gerarCalculo3158 === 'function') {
@@ -798,19 +849,19 @@
                     }
                 } else if (rubrica === '321') {
                     if (typeof gerarCalculo321 === 'function') {
-                        htmlCalculo += gerarCalculo321(data, valorRemuneracao, tipoSalvo);
+                        htmlCalculo += gerarCalculo321(data, valorRemuneracao, tipoSalvo, bloqInfo.bloqueado, bloqInfo.numFolha, difSalva);
                     } else {
                         htmlCalculo += `<div class="error-msg">Erro: Arquivo rubricas/321.js não carregado.</div>`;
                     }
                 } else if (rubrica === '476') {
                     if (typeof gerarCalculo476 === 'function') {
-                        htmlCalculo += gerarCalculo476(data, valorPVR, tipoSalvo);
+                        htmlCalculo += gerarCalculo476(data, valorPVR, tipoSalvo, bloqInfo.bloqueado, bloqInfo.numFolha, difSalva);
                     } else {
                         htmlCalculo += `<div class="error-msg">Erro: Arquivo rubricas/476.js não carregado.</div>`;
                     }
                 } else if (rubrica === '660') {
                     if (typeof gerarCalculo660 === 'function') {
-                        htmlCalculo += gerarCalculo660(data, valorVencimento, tipoSalvo);
+                        htmlCalculo += gerarCalculo660(data, valorRemuneracao, valorPVR, tipoSalvo, bloqInfo.bloqueado, bloqInfo.numFolha);
                     } else {
                         htmlCalculo += `<div class="error-msg">Erro: Arquivo rubricas/660.js não carregado.</div>`;
                     }
@@ -878,9 +929,9 @@
                     dtinialt: cols[19] || '-',
                     dtalt: cols[20] || '-',
                     tipoalt: cols[21] || '-',
-                    temfalt: cols[25] || 'Não',
-                    temlic: cols[26] || 'Não',
-                    temreducao: cols[29] || 'Não'
+                    temfalt: cols[25] || '',
+                    temlic: cols[26] || '',
+                    temreducao: cols[29] || ''
                 };
 
                 const jsonEncoded = encodeURIComponent(JSON.stringify(cardDataObject));
@@ -896,6 +947,10 @@
                 } else {
                     htmlRubrica476 = `<label class="rubrica-item"><input type="checkbox" value="476" onchange="atualizarCalculos('${jsonEncoded}')"> 476 - DIFERENÇA DE PVR</label>`;
                 }
+
+                const faltasObj = formatarOcorrencia(cardDataObject.temfalt);
+                const licencaObj = formatarOcorrencia(cardDataObject.temlic);
+                const reducaoObj = formatarOcorrencia(cardDataObject.temreducao);
 
                 const cardHTML = `
                     <div class="card" id="${cardId}" data-json="${jsonEncoded}">
@@ -963,15 +1018,15 @@
                                     <strong>OCORRÊNCIAS</strong>
                                     <div class="info-group">
                                         <label>Faltas</label>
-                                        <span>${cardDataObject.temfalt}</span>
+                                        <span class="${faltasObj.classe}">${faltasObj.texto}</span>
                                     </div>
                                     <div class="info-group">
                                         <label>Licença</label>
-                                        <span>${cardDataObject.temlic}</span>
+                                        <span class="${licencaObj.classe}">${licencaObj.texto}</span>
                                     </div>
                                     <div class="info-group" style="margin-bottom:0;">
                                         <label>Redução</label>
-                                        <span>${cardDataObject.temreducao}</span>
+                                        <span class="${reducaoObj.classe}">${reducaoObj.texto}</span>
                                     </div>
                                 </div>
 
