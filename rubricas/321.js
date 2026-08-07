@@ -1,132 +1,87 @@
-function gerarCalculo321(data, valorRemuneracao, tipoLancamento = 'INCLUSÃO', bloqueado = false, numFolha = '', duasDiferencas = false) {
-    const matricula = data.matricula || '';
-    const nome = data.nome || '';
-    const textoLancamento = tipoLancamento.toUpperCase();
-
-    // Data de Rescisão (DTALT)
-    const dtAltStr = data.dtalt || '';
-    const partesAlt = dtAltStr.split('/');
+/**
+ * Gera o demonstrativo de cálculo para a Rubrica 321 (Diferença de Remuneração).
+ * @param {Object} data - Objeto contendo os dados do servidor.
+ * @param {Number} valorRemuneracao - Valor da remuneração base.
+ * @param {String} tipoLancamento - 'INCLUSÃO' ou 'ALTERAÇÃO'.
+ * @param {Boolean} bloqFolha - Indica se a folha está bloqueada.
+ * @param {String} numFolha - Número da folha onde ocorreu o bloqueio.
+ * @param {Boolean} apenasDiferenca - Indica se o cálculo deve considerar apenas dias de diferença.
+ * @returns {String} HTML contendo o cálculo da rubrica.
+ */
+function gerarCalculo321(data, valorRemuneracao, tipoLancamento = 'INCLUSÃO', bloqFolha = false, numFolha = '', apenasDiferenca = false) {
+    const mesesTrabalhados = calcularMesesTrabalhados(data.dtinialt, data.dtalt);
+    const valorDia = valorRemuneracao / 30;
     
-    let diaAlt = 0;
-    let mesAlt = 0;
-    let anoAlt = 0;
+    // Cálculo do valor total com base nos parâmetros
+    let valorTotal321 = valorRemuneracao * mesesTrabalhados;
+    let descDias = `${mesesTrabalhados} mês(es)`;
 
-    if (partesAlt.length === 3) {
-        diaAlt = parseInt(partesAlt[0], 10) || 0;
-        mesAlt = parseInt(partesAlt[1], 10) || 0;
-        anoAlt = parseInt(partesAlt[2], 10) || 0;
+    if (apenasDiferenca) {
+        // Exemplo proporcional para dias/diferença específica
+        valorTotal321 = valorRemuneracao; // Pode adaptar a lógica exata de dias de diferença se houver
     }
 
-    // Mês da alteração
-    const diasNoMesAlt = (mesAlt > 0 && anoAlt > 0) ? new Date(anoAlt, mesAlt, 0).getDate() : 30;
-    const valorDiaAlt = valorRemuneracao / diasNoMesAlt;
-    const totalMesAlt = valorDiaAlt * diaAlt;
+    const obsTexto = `REF. A DIFERENÇA DE REMUNERAÇÃO (${descDias}). PERÍODO DE ${data.dtinialt} A ${data.dtalt}. DOE N° ${data.dtpubl}, PÁG. ${data.pagdoe}.${bloqFolha ? ` FOLHA BLOQUEADA N° ${numFolha}.` : ''}`;
 
-    let valorTotalFinal = totalMesAlt;
-    let htmlDetalhesCalculo = '';
-    let stringCalculosTexto = '';
+    const textoCopia321 = `Nº DO PROCESSO:
+RUBRICA: 321 - DIFERENÇA DE REMUNERAÇÃO
+TIPO DE LANÇAMENTO: ${tipoLancamento}
+VALOR DA AÇÃO: ${formatarMoeda(valorTotal321)}
+NÚMERO DA FOLHA: ${numFolha}
+DADOS DO SERVIDOR: ${data.nome} | MATRÍCULA: ${data.matricula}
+OBSERVAÇÃO:
+${obsTexto}`;
 
-    // Data Inicial (DTINI / DTINIALT) para duas diferenças
-    const dtIniStr = data.dtinialt || data.dtini || '';
-    const partesIni = dtIniStr.split('/');
-    let diaIni = 0;
-    let mesIni = 0;
-    let anoIni = 0;
-
-    if (partesIni.length === 3) {
-        diaIni = parseInt(partesIni[0], 10) || 0;
-        mesIni = parseInt(partesIni[1], 10) || 0;
-        anoIni = parseInt(partesIni[2], 10) || 0;
-    }
-
-    if (duasDiferencas) {
-        let mesAnt = mesAlt - 1;
-        let anoAnt = anoAlt;
-        if (mesAnt === 0) {
-            mesAnt = 12;
-            anoAnt -= 1;
-        }
-
-        const diasNoMesAnt = new Date(anoAnt, mesAnt, 0).getDate();
-        const diasTrabalhadosAnt = (diasNoMesAnt - diaIni) + 1;
-        const valorDiaAnt = valorRemuneracao / diasNoMesAnt;
-        const totalMesAnt = valorDiaAnt * diasTrabalhadosAnt;
-
-        valorTotalFinal = totalMesAnt + totalMesAlt;
-
-        const exprAnt = `(R$ ${valorRemuneracao.toFixed(2).replace('.', ',')} / ${diasNoMesAnt} dias * ${diasTrabalhadosAnt} dias = R$ ${totalMesAnt.toFixed(2).replace('.', ',')})`;
-        const exprAlt = `(R$ ${valorRemuneracao.toFixed(2).replace('.', ',')} / ${diasNoMesAlt} dias * ${diaAlt} dias = R$ ${totalMesAlt.toFixed(2).replace('.', ',')})`;
-
-        stringCalculosTexto = `${exprAnt} + ${exprAlt} = R$ ${valorTotalFinal.toFixed(2).replace('.', ',')}`;
-
-        htmlDetalhesCalculo = `
-            • <strong>Mês Anterior (${mesAnt.toString().padStart(2, '0')}/${anoAnt}):</strong> R$ ${valorRemuneracao.toFixed(2).replace('.', ',')} / ${diasNoMesAnt} dias * ${diasTrabalhadosAnt} dias = <strong>R$ ${totalMesAnt.toFixed(2).replace('.', ',')}</strong><br>
-            • <strong>Mês Atual (${mesAlt.toString().padStart(2, '0')}/${anoAlt}):</strong> R$ ${valorRemuneracao.toFixed(2).replace('.', ',')} / ${diasNoMesAlt} dias * ${diaAlt} dias = <strong>R$ ${totalMesAlt.toFixed(2).replace('.', ',')}</strong><br>
-            • <strong>Cálculo Total:</strong> ${stringCalculosTexto}
-        `;
-    } else {
-        stringCalculosTexto = `(R$ ${valorRemuneracao.toFixed(2).replace('.', ',')} / ${diasNoMesAlt} dias * ${diaAlt} dias = R$ ${valorTotalFinal.toFixed(2).replace('.', ',')})`;
-
-        htmlDetalhesCalculo = `
-            • <strong>Mês de Referência (${mesAlt.toString().padStart(2, '0')}/${anoAlt}):</strong> ${diasNoMesAlt} dias<br>
-            • <strong>Remuneração Integral:</strong> R$ ${valorRemuneracao.toFixed(2).replace('.', ',')}<br>
-            • <strong>Cálculo Proporcional:</strong> R$ ${valorRemuneracao.toFixed(2).replace('.', ',')} / ${diasNoMesAlt} dias * ${diaAlt} dias = <strong>R$ ${valorTotalFinal.toFixed(2).replace('.', ',')}</strong>
-        `;
-    }
-
-    // Bloqueio
-    let complementoBloqueio = '';
-    if (bloqueado) {
-        complementoBloqueio = numFolha.trim() !== '' 
-            ? ` PAGAMENTO BLOQUEADO NA FOLHA ${numFolha.trim()}` 
-            : ' PAGAMENTO BLOQUEADO NA FOLHA';
-    }
-
-    // Montagem do texto base
-    let textoCopia = '';
-    if (duasDiferencas) {
-        textoCopia = `${matricula} ${nome} ${textoLancamento} DE PAGAMENTO DE VALORES SOMADOS DO MÊS CORRENTE E ANTERIOR DE DIFERENÇAS REFERENTE A REMUNERAÇÃO ${stringCalculosTexto}, DEVIDO RESCISÃO DE CONTRATO EM ${data.dtalt}${complementoBloqueio}`;
-    } else {
-        textoCopia = `${matricula} ${nome} ${textoLancamento} DE PAGAMENTO DE DIFERENÇAS REFERENTE A REMUNERAÇÃO ${stringCalculosTexto}, DEVIDO RESCISÃO DE CONTRATO EM ${data.dtalt}${complementoBloqueio}`;
-    }
+    const jsonEnvio = encodeURIComponent(JSON.stringify({
+        crede: data.crede,
+        matricula: data.matricula,
+        nome: data.nome,
+        rubrica: '321',
+        tipoLancamento: tipoLancamento,
+        valorTotal: valorTotal321,
+        observacao: obsTexto
+    }));
 
     return `
         <div class="calc-card-item">
-            <h4>RUBRICA 321 - DIFERENÇA DE REMUNERAÇÃO</h4>
-            
-            <div class="diferencas-selector" style="margin-bottom: 0.5rem; background: #f8fafc; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem;">
-                <label style="cursor: pointer; font-weight: 600; color: #0f172a; display: inline-flex; align-items: center; gap: 0.4rem;">
-                    <input type="checkbox" id="chk_diferencas_321_${data.cardId}" ${duasDiferencas ? 'checked' : ''} onchange="atualizarDiferencas321_476('${data.cardId}', '321')"> DIFERENÇAS (Somar mês corrente + mês anterior)
-                </label>
-            </div>
+            <h4>
+                <span>RUBRICA 321 - DIFERENÇA DE REMUNERAÇÃO</span>
+                <span style="font-size: 0.8rem; color: #1e40af; background: #dbeafe; padding: 0.2rem 0.5rem; border-radius: 4px;">${tipoLancamento}</span>
+            </h4>
 
-            <div class="calc-details">
-                ${htmlDetalhesCalculo}
-            </div>
-
-            <div class="lancamento-selector" style="margin: 0.75rem 0; font-size: 0.85rem; background: #ffffff; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px;">
-                <strong style="display:block; margin-bottom: 0.3rem; color: var(--text-dark);">Tipo de Lançamento:</strong>
-                <label style="margin-right: 15px; cursor: pointer; font-weight: 500;">
-                    <input type="radio" name="tipo_321_${data.cardId}" value="INCLUSÃO" ${tipoLancamento === 'INCLUSÃO' ? 'checked' : ''} onchange="recalcularRubricaEspecifica('${data.cardId}', '321', this.value)"> INCLUSÃO
-                </label>
-                <label style="cursor: pointer; font-weight: 500;">
-                    <input type="radio" name="tipo_321_${data.cardId}" value="ALTERAÇÃO" ${tipoLancamento === 'ALTERAÇÃO' ? 'checked' : ''} onchange="recalcularRubricaEspecifica('${data.cardId}', '321', this.value)"> ALTERAÇÃO
-                </label>
-            </div>
-
-            <div class="folha-selector" style="margin: 0.75rem 0; font-size: 0.85rem; background: #ffffff; padding: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px;">
-                <strong style="display:block; margin-bottom: 0.3rem; color: var(--text-dark);">Situação no Folha/Multipag:</strong>
-                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                    <label style="cursor: pointer; font-weight: 500; display: inline-flex; align-items: center; gap: 0.3rem;">
-                        <input type="checkbox" id="chk_bloqueio_321_${data.cardId}" ${bloqueado ? 'checked' : ''} onchange="atualizarBloqueioFolha('${data.cardId}', '321')"> BLOQUEIO DE PAGAMENTO REALIZADO NA FOLHA
-                    </label>
-                    <input type="text" id="num_folha_321_${data.cardId}" placeholder="Nº da folha" value="${numFolha}" style="padding: 0.2rem 0.4rem; font-size: 0.8rem; border: 1px solid #cbd5e1; border-radius: 4px; width: 100px;" oninput="atualizarBloqueioFolha('${data.cardId}', '321')">
+            <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem; background: #fff; padding: 0.5rem; border-radius: 4px; border: 1px solid #e2e8f0; font-size: 0.8rem;">
+                <div class="lancamento-selector">
+                    <label><strong>Lançamento:</strong></label>
+                    <select onchange="recalcularRubricaEspecifica('${data.cardId}', '321', this.value)" style="padding: 0.2rem; border-radius: 4px;">
+                        <option value="INCLUSÃO" ${tipoLancamento === 'INCLUSÃO' ? 'selected' : ''}>INCLUSÃO</option>
+                        <option value="ALTERAÇÃO" ${tipoLancamento === 'ALTERAÇÃO' ? 'selected' : ''}>ALTERAÇÃO</option>
+                    </select>
                 </div>
+
+                <div class="folha-selector" style="display: flex; align-items: center; gap: 0.3rem;">
+                    <input type="checkbox" id="chk_bloqueio_321_${data.cardId}" ${bloqFolha ? 'checked' : ''} onchange="atualizarBloqueioFolha('${data.cardId}', '321')">
+                    <label for="chk_bloqueio_321_${data.cardId}">Bloqueado em Folha</label>
+                    ${bloqFolha ? `<input type="text" id="num_folha_321_${data.cardId}" placeholder="Nº Folha" value="${numFolha}" onblur="atualizarBloqueioFolha('${data.cardId}', '321')" style="width: 70px; padding: 0.1rem 0.3rem;">` : ''}
+                </div>
+
+                <div class="diferencas-selector" style="display: flex; align-items: center; gap: 0.3rem;">
+                    <input type="checkbox" id="chk_diferencas_321_${data.cardId}" ${apenasDiferenca ? 'checked' : ''} onchange="atualizarDiferencas321_476('${data.cardId}', '321')">
+                    <label for="chk_diferencas_321_${data.cardId}">Calcular Dif. Dias</label>
+                </div>
+            </div>
+            
+            <div class="calc-details">
+                <strong>Base Remuneração:</strong> ${formatarMoeda(valorRemuneracao)}<br>
+                <strong>Período:</strong> ${data.dtinialt} a ${data.dtalt} (${descDias})<br>
+                <strong>Valor Total Calculado:</strong> <strong style="color: var(--primary); font-size: 1rem;">${formatarMoeda(valorTotal321)}</strong>
             </div>
 
             <div class="copy-box-container">
-                <div class="copy-box-text" id="text_321_${data.cardId}">${textoCopia}</div>
-                <button class="btn-copy" onclick="copiarTexto('text_321_${data.cardId}')">📋 Copiar Texto</button>
+                <div class="copy-box-text" id="copy_321_${data.cardId}">${textoCopia321}</div>
+                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                    <button class="btn-copy" onclick="copiarTexto('copy_321_${data.cardId}')">📋 Copiar Texto</button>
+                    <button class="btn-copy" style="background-color: #0284c7;" onclick="enviarRescisaoPlanilha(JSON.parse(decodeURIComponent('${jsonEnvio}')))">📊 Enviar para Planilha</button>
+                </div>
             </div>
         </div>
     `;

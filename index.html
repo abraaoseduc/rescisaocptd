@@ -567,6 +567,9 @@
         </button>
     </div>
 
+    <!-- Importação do utilitário principal -->
+    <script src="utils.js"></script>
+
     <!-- Importação das rubricas externas -->
     <script src="rubricas/3158.js"></script>
     <script src="rubricas/321.js"></script>
@@ -916,6 +919,7 @@
 
                 const cardDataObject = {
                     cardId: cardId,
+                    crede: cols[0] || '-',
                     matricula: tratarMatricula(cols[2] || ''),
                     nome: cols[3] || '-',
                     tipo: cols[4] || '',
