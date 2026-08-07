@@ -1,8 +1,16 @@
-// URL da sua API do Google Apps Script na SEDUC (Atualizada)
 const URL_WEB_APP_GSHEETS = "https://script.google.com/a/macros/seduc.ce.gov.br/s/AKfycbyQIiJP3ooupBeaLM12YgKfZsVb4tHDr7pQcPTPC587d3bHRGhfCGJ-cbJNBL-yWLp0/exec";
 
+// Escuta a mensagem de sucesso ou erro enviada pelo iframe/Apps Script
+window.addEventListener("message", function(event) {
+    if (event.data === 'SUCCESS') {
+        alert("✅ Dados salvos na planilha com sucesso!");
+    } else if (typeof event.data === 'string' && event.data.startsWith('ERROR:')) {
+        alert("❌ Erro ao salvar na planilha: " + event.data);
+    }
+});
+
 /**
- * Envia os dados da rescisão para a planilha via Formulário Dinâmico em Iframe
+ * Envia os dados da rescisão para a planilha do Google
  * @param {Object} payload Dados do cálculo
  */
 function enviarRescisaoPlanilha(payload) {
@@ -21,16 +29,21 @@ function enviarRescisaoPlanilha(payload) {
         document.body.appendChild(iframe);
     }
 
-    // Feedback visual do botão
+    // Feedback visual no botão que disparou o evento
     const botaoClicado = document.activeElement;
     let textoOriginal = "";
     if (botaoClicado && botaoClicado.tagName === "BUTTON") {
         textoOriginal = botaoClicado.innerHTML;
         botaoClicado.innerText = "Enviando...";
         botaoClicado.disabled = true;
+
+        setTimeout(() => {
+            botaoClicado.innerHTML = textoOriginal;
+            botaoClicado.disabled = false;
+        }, 2000);
     }
 
-    // Cria formulário dinâmico para submeter via POST para o iframe
+    // Cria formulário dinâmico para submeter os dados em stringify
     const form = document.createElement("form");
     form.method = "POST";
     form.action = URL_WEB_APP_GSHEETS;
@@ -46,20 +59,9 @@ function enviarRescisaoPlanilha(payload) {
 
     try {
         form.submit();
-        setTimeout(() => {
-            alert(`Dados da Rubrica ${payload.rubrica || ''} enviados para a planilha!`);
-            if (botaoClicado && botaoClicado.tagName === "BUTTON") {
-                botaoClicado.innerHTML = textoOriginal;
-                botaoClicado.disabled = false;
-            }
-        }, 1200);
     } catch (e) {
         console.error("Erro ao submeter formulário:", e);
         alert("Falha ao tentar enviar os dados para a planilha.");
-        if (botaoClicado && botaoClicado.tagName === "BUTTON") {
-            botaoClicado.innerHTML = textoOriginal;
-            botaoClicado.disabled = false;
-        }
     } finally {
         document.body.removeChild(form);
     }
