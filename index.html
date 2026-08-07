@@ -376,7 +376,7 @@
             margin-top: 0.5rem;
         }
 
-        /* ESTILO PROFISSIONAL PARA IMPRESSÃO / PDF */
+        /* ESTILO PARA IMPRESSÃO / PDF */
         @media print {
             @page {
                 size: A4 portrait;
@@ -407,7 +407,7 @@
                 color: #14532d !important;
             }
 
-            .input-section, .print-section, .btn-copy, .rubricas-container, .badge-block:has(.rubricas-container) {
+            .input-section, .print-section, .btn-copy, .rubricas-container, .badge-block:has(.rubricas-container), .lancamento-selector {
                 display: none !important;
             }
 
@@ -446,7 +446,6 @@
                 gap: 1rem !important;
             }
 
-            /* Reformata a coluna esquerda para uma grade compacta */
             .left-column {
                 display: grid !important;
                 grid-template-columns: repeat(3, 1fr) !important;
@@ -571,6 +570,8 @@
     <script src="rubricas/619-412.js"></script>
 
     <script>
+        window.estadoTiposLancamento = {};
+
         const TABELA_K081_K082 = {
             1:  { mensal: 5,   remuneracao: 130.74,  pvr: 12.50,  somatorio: 143.24 },
             2:  { mensal: 10,  remuneracao: 261.48,  pvr: 25.00,  somatorio: 286.48 },
@@ -726,8 +727,16 @@
             });
         }
 
-        function recalcularCard(encodedJson) {
-            atualizarCalculos(encodedJson);
+        function recalcularRubricaEspecifica(cardId, rubrica, novoTipo) {
+            if (!window.estadoTiposLancamento[cardId]) {
+                window.estadoTiposLancamento[cardId] = {};
+            }
+            window.estadoTiposLancamento[cardId][rubrica] = novoTipo;
+            
+            const card = document.getElementById(cardId);
+            if (card && card.dataset.json) {
+                atualizarCalculos(card.dataset.json);
+            }
         }
 
         function atualizarCalculos(cardDataJson) {
@@ -779,6 +788,8 @@
             htmlCalculo += `</div>`;
 
             selecionadas.forEach((rubrica) => {
+                const tipoSalvo = (window.estadoTiposLancamento[data.cardId] && window.estadoTiposLancamento[data.cardId][rubrica]) || 'INCLUSÃO';
+
                 if (rubrica === '3158') {
                     if (typeof gerarCalculo3158 === 'function') {
                         htmlCalculo += gerarCalculo3158(data, valorVencimento);
@@ -787,19 +798,19 @@
                     }
                 } else if (rubrica === '321') {
                     if (typeof gerarCalculo321 === 'function') {
-                        htmlCalculo += gerarCalculo321(data, valorRemuneracao);
+                        htmlCalculo += gerarCalculo321(data, valorRemuneracao, tipoSalvo);
                     } else {
                         htmlCalculo += `<div class="error-msg">Erro: Arquivo rubricas/321.js não carregado.</div>`;
                     }
                 } else if (rubrica === '476') {
                     if (typeof gerarCalculo476 === 'function') {
-                        htmlCalculo += gerarCalculo476(data, valorPVR);
+                        htmlCalculo += gerarCalculo476(data, valorPVR, tipoSalvo);
                     } else {
                         htmlCalculo += `<div class="error-msg">Erro: Arquivo rubricas/476.js não carregado.</div>`;
                     }
                 } else if (rubrica === '660') {
                     if (typeof gerarCalculo660 === 'function') {
-                        htmlCalculo += gerarCalculo660(data, valorVencimento);
+                        htmlCalculo += gerarCalculo660(data, valorVencimento, tipoSalvo);
                     } else {
                         htmlCalculo += `<div class="error-msg">Erro: Arquivo rubricas/660.js não carregado.</div>`;
                     }
@@ -887,7 +898,7 @@
                 }
 
                 const cardHTML = `
-                    <div class="card" id="${cardId}">
+                    <div class="card" id="${cardId}" data-json="${jsonEncoded}">
                         <div class="card-header">
                             <h2>${cardDataObject.nome}</h2>
                             <div class="matricula">MATRÍCULA: ${cardDataObject.matricula}</div>
